@@ -1,0 +1,15 @@
+{
+  "name": "german-foundations-word-addin",
+  "version": "1.0.0",
+  "description": "Word add-in for sorting German noun-group sections",
+  "private": true,
+  "scripts": {
+    "certs": "npx office-addin-dev-certs install",
+    "start": "npx http-server -S -C \"$HOME/.office-addin-dev-certs/localhost.crt\" -K \"$HOME/.office-addin-dev-certs/localhost.key\" -p 3000 --cors",
+    "sideload": "cp manifest.xml \"$HOME/Library/Containers/com.microsoft.Word/Data/Documents/wef/\""
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "office-addin-dev-certs": "^1.13.1"
+  }
+}

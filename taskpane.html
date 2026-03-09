@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>German Foundations Sort</title>
+    <link rel="stylesheet" href="taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Section Detection Panel -->
+      <div class="panel">
+        <div id="no-section">
+          <p id="no-section-msg" class="message">
+            Place your cursor in a noun-group table to get started.
+          </p>
+        </div>
+        <div id="current-section" class="hidden">
+          <div class="label">Currently in</div>
+          <div id="category-name" class="category-name"></div>
+          <div class="section-row">
+            <span id="section-type" class="section-badge"></span>
+            <span id="main-gender" class="gender-label"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sort Action -->
+      <div class="panel">
+        <button id="sort-btn" class="primary-btn" disabled>
+          Sort This Section
+        </button>
+        <div id="uncolored-warning" class="warning hidden">
+          <p>These words have no gender color assigned:</p>
+          <ul id="uncolored-list"></ul>
+          <p class="hint">
+            Set the font color for each word before sorting.
+          </p>
+        </div>
+      </div>
+
+      <!-- Monos Management -->
+      <div class="panel">
+        <h3>Monosyllabic Words</h3>
+        <div class="input-row">
+          <input type="text" id="mono-input" placeholder="Add word..." />
+          <button id="add-mono-btn" class="secondary-btn">Add</button>
+        </div>
+        <div class="mono-info">
+          <span id="mono-count">0 words</span>
+          <button id="import-monos-btn" class="link-btn">
+            Import from CSV
+          </button>
+          <input
+            type="file"
+            id="import-file"
+            accept=".csv,.txt"
+            class="hidden"
+          />
+        </div>
+        <div id="monos-empty" class="hint hidden">
+          No monos list loaded. Import your monos.csv to get started.
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <div id="status-bar">
+        <span id="status-text">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Load scripts in dependency order -->
+    <script src="js/sorting.js"></script>
+    <script src="js/monos.js"></script>
+    <script src="js/comments.js"></script>
+    <script src="js/document.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
