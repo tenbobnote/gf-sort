@@ -21,6 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache-bust static assets
+        run: |
+          HASH=$(git rev-parse --short HEAD)
+          echo "Build version: $HASH"
+          # Add ?v=HASH to all local script and stylesheet references
+          sed -i "s|href=\"taskpane.css\"|href=\"taskpane.css?v=$HASH\"|g" taskpane.html
+          sed -i "s|src=\"js/|src=\"js/|g; s|src=\"js/\([^\"]*\)\"|src=\"js/\1?v=$HASH\"|g" taskpane.html
+          # Inject build version into app.js
+          sed -i "s|__BUILD_VERSION__|$HASH|g" js/app.js
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -227,3 +227,24 @@ h3 {
   font-size: 11px;
   color: var(--gray);
 }
+
+#version-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+#version-text {
+  font-size: 10px;
+  color: #aaa;
+}
+
+#refresh-btn {
+  font-size: 10px;
+  color: #aaa;
+}
+
+#refresh-btn:hover {
+  color: var(--blue);
+}

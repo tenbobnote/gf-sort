@@ -10,6 +10,7 @@ GF.App = (function () {
   var _currentSection = null;
   var _detectionTimeout = null;
   var _monosCount = 0;
+  var BUILD_VERSION = "__BUILD_VERSION__";
 
   // ── Initialization ──
 
@@ -42,6 +43,17 @@ GF.App = (function () {
 
     // Load monos count
     loadMonosInfo();
+
+    // Version display and refresh
+    var versionEl = document.getElementById("version-text");
+    if (BUILD_VERSION !== "__BUILD_" + "VERSION__") {
+      versionEl.textContent = "v" + BUILD_VERSION;
+    } else {
+      versionEl.textContent = "dev";
+    }
+    document.getElementById("refresh-btn").addEventListener("click", function () {
+      window.location.reload(true);
+    });
 
     setStatus("Ready");
   }
