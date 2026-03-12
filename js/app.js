@@ -1,6 +1,7 @@
 /**
  * app.js — Main entry point. Handles initialization, UI events, and
- * orchestrates section detection, sorting, and comment preservation.
+ * orchestrates section detection, sorting, column conversion, and
+ * comment preservation.
  */
 var GF = GF || {};
 
@@ -8,6 +9,7 @@ GF.App = (function () {
   "use strict";
 
   var _currentSection = null;
+  var _currentColumnCount = null;
   var _detectionTimeout = null;
   var _monosCount = 0;
   var BUILD_VERSION = "__BUILD_VERSION__";
@@ -17,6 +19,9 @@ GF.App = (function () {
   function init() {
     // Bind UI events
     document.getElementById("sort-btn").addEventListener("click", onSortClick);
+    document
+      .getElementById("convert-btn")
+      .addEventListener("click", onConvertClick);
     document
       .getElementById("add-mono-btn")
       .addEventListener("click", onAddMonoClick);
@@ -51,9 +56,11 @@ GF.App = (function () {
     } else {
       versionEl.textContent = "dev";
     }
-    document.getElementById("refresh-btn").addEventListener("click", function () {
-      window.location.reload(true);
-    });
+    document
+      .getElementById("refresh-btn")
+      .addEventListener("click", function () {
+        window.location.reload(true);
+      });
 
     setStatus("Ready");
   }
@@ -72,18 +79,25 @@ GF.App = (function () {
       if (result.error) {
         showNoSection(result.error);
         _currentSection = null;
+        _currentColumnCount = null;
         return;
       }
 
       _currentSection = result;
-      showSection(result);
+
+      // Get column count for convert button label
+      var colCount = await GF.Document.getColumnCount();
+      _currentColumnCount = colCount;
+
+      showSection(result, colCount);
     } catch (e) {
       showNoSection("Place your cursor in a noun-group table.");
       _currentSection = null;
+      _currentColumnCount = null;
     }
   }
 
-  function showSection(section) {
+  function showSection(section, colCount) {
     document.getElementById("no-section").classList.add("hidden");
     document.getElementById("current-section").classList.remove("hidden");
     document.getElementById("category-name").textContent = section.pageTitle;
@@ -93,7 +107,28 @@ GF.App = (function () {
     document.getElementById("main-gender").textContent =
       genderLabel[section.mainGender] || "";
 
+    // Show column count
+    var colCountEl = document.getElementById("column-count");
+    if (colCountEl && colCount) {
+      colCountEl.textContent = colCount + " columns";
+    }
+
+    // Enable sort button
     document.getElementById("sort-btn").disabled = false;
+
+    // Update convert button label and visibility
+    var convertBtn = document.getElementById("convert-btn");
+    if (colCount === 4) {
+      convertBtn.textContent = "Convert to 3 Columns";
+      convertBtn.classList.remove("hidden");
+      convertBtn.disabled = false;
+    } else if (colCount === 3) {
+      convertBtn.textContent = "Convert to 4 Columns";
+      convertBtn.classList.remove("hidden");
+      convertBtn.disabled = false;
+    } else {
+      convertBtn.classList.add("hidden");
+    }
   }
 
   function showNoSection(message) {
@@ -101,6 +136,7 @@ GF.App = (function () {
     document.getElementById("no-section-msg").textContent = message;
     document.getElementById("current-section").classList.add("hidden");
     document.getElementById("sort-btn").disabled = true;
+    document.getElementById("convert-btn").classList.add("hidden");
     document.getElementById("uncolored-warning").classList.add("hidden");
   }
 
@@ -110,7 +146,9 @@ GF.App = (function () {
     if (!_currentSection) return;
 
     var sortBtn = document.getElementById("sort-btn");
+    var convertBtn = document.getElementById("convert-btn");
     sortBtn.disabled = true;
+    convertBtn.disabled = true;
     setStatus("Reading table...");
 
     try {
@@ -119,6 +157,7 @@ GF.App = (function () {
       if (tableData.error) {
         setStatus("Error: " + tableData.error);
         sortBtn.disabled = false;
+        convertBtn.disabled = false;
         return;
       }
 
@@ -127,6 +166,7 @@ GF.App = (function () {
         showUncoloredWarning(tableData.uncolored);
         setStatus("Fix uncolored words before sorting.");
         sortBtn.disabled = false;
+        convertBtn.disabled = false;
         return;
       }
       hideUncoloredWarning();
@@ -148,17 +188,16 @@ GF.App = (function () {
               " comment(s). Tracking for restoration..."
           );
         } else {
-          // Comments exist in the table but capture failed
           setStatus(
             "Warning: " +
               tableCommentCount +
-              " comment(s) detected but could not be captured. Sort aborted to protect comments."
+              " comment(s) detected but could not be captured. Sort aborted."
           );
           sortBtn.disabled = false;
+          convertBtn.disabled = false;
           return;
         }
       } else if (tableCommentCount === -1) {
-        // Comments API not available — warn but allow sort
         setStatus("Comments API not available. Comments may be lost.");
       }
 
@@ -186,9 +225,8 @@ GF.App = (function () {
       }
 
       if (!changed) {
-        setStatus("Already in correct order. No changes needed.");
-        sortBtn.disabled = false;
-        return;
+        // Even if order hasn't changed, still apply column alignment
+        setStatus("Order unchanged. Applying column alignment...");
       }
 
       // 7. Delete original comments (before rewriting cells)
@@ -197,9 +235,12 @@ GF.App = (function () {
         await GF.Comments.deleteOriginalComments(commentMap);
       }
 
-      // 8. Write sorted items back
-      setStatus("Writing sorted items...");
-      await GF.Document.writeTableItems(sorted, tableData.numGroups);
+      // 8. Write sorted items with page-level column alignment
+      setStatus("Writing sorted items + aligning columns...");
+      var result = await GF.Document.sortWithAlignment(
+        sorted,
+        tableData.numGroups
+      );
 
       // 9. Restore comments in new positions
       if (commentCount > 0) {
@@ -207,20 +248,153 @@ GF.App = (function () {
         await GF.Comments.restoreComments(commentMap);
       }
 
-      setStatus(
-        "Sorted " +
-          sorted.length +
-          " items. Use Ctrl+Z to undo." +
-          (commentCount > 0
-            ? " " + commentCount + " comment(s) preserved."
-            : "")
-      );
+      var statusMsg =
+        "Sorted " + sorted.length + " items. Use Ctrl+Z to undo.";
+      if (result.shrinkCount > 0) {
+        statusMsg += " " + result.shrinkCount + " cell(s) font-reduced.";
+      }
+      if (result.pageTableCount > 1) {
+        statusMsg +=
+          " Aligned " + result.pageTableCount + " tables on page.";
+      }
+      if (commentCount > 0) {
+        statusMsg += " " + commentCount + " comment(s) preserved.";
+      }
+      setStatus(statusMsg);
     } catch (e) {
       console.error("Sort error:", e);
       setStatus("Error: " + e.message);
     }
 
     sortBtn.disabled = false;
+    convertBtn.disabled = false;
+  }
+
+  // ── Convert Operation ──
+
+  async function onConvertClick() {
+    if (!_currentSection || !_currentColumnCount) return;
+
+    var targetGroups = _currentColumnCount === 4 ? 3 : 4;
+    var sortBtn = document.getElementById("sort-btn");
+    var convertBtn = document.getElementById("convert-btn");
+    sortBtn.disabled = true;
+    convertBtn.disabled = true;
+
+    setStatus("Reading table...");
+
+    try {
+      // 1. Read items from the table
+      var tableData = await GF.Document.readTableItems();
+      if (tableData.error) {
+        setStatus("Error: " + tableData.error);
+        sortBtn.disabled = false;
+        convertBtn.disabled = false;
+        return;
+      }
+
+      // 2. Check for uncolored words
+      if (tableData.uncolored.length > 0) {
+        showUncoloredWarning(tableData.uncolored);
+        setStatus("Fix uncolored words before converting.");
+        sortBtn.disabled = false;
+        convertBtn.disabled = false;
+        return;
+      }
+      hideUncoloredWarning();
+
+      // 3. Capture comments
+      setStatus("Checking comments...");
+      var commentMap = {};
+      var commentCount = 0;
+      var tableCommentCount = await GF.Comments.countCommentsInTable();
+
+      if (tableCommentCount > 0) {
+        commentMap = await GF.Comments.captureComments();
+        commentCount = GF.Comments.countComments(commentMap);
+
+        if (commentCount > 0) {
+          setStatus(
+            "Found " + commentCount + " comment(s). Tracking for restoration..."
+          );
+        } else {
+          setStatus(
+            "Warning: " +
+              tableCommentCount +
+              " comment(s) detected but could not be captured. Convert aborted."
+          );
+          sortBtn.disabled = false;
+          convertBtn.disabled = false;
+          return;
+        }
+      } else if (tableCommentCount === -1) {
+        setStatus("Comments API not available. Comments may be lost.");
+      }
+
+      // 4. Load monos
+      setStatus("Loading reference data...");
+      GF.Monos.clearCache();
+      var monosSet = await GF.Monos.getMonosSet();
+
+      // 5. Sort items
+      setStatus("Sorting " + tableData.items.length + " items...");
+      var sorted = GF.Sorting.sortItems(
+        tableData.items,
+        _currentSection.sectionType,
+        _currentSection.mainGender,
+        monosSet
+      );
+
+      // 6. Delete original comments
+      if (commentCount > 0) {
+        setStatus("Removing original comments...");
+        await GF.Comments.deleteOriginalComments(commentMap);
+      }
+
+      // 7. Convert: delete old table, create new with target columns, align
+      setStatus(
+        "Converting to " +
+          targetGroups +
+          " columns + sorting + aligning..."
+      );
+      var result = await GF.Document.convertAndSort(sorted, targetGroups);
+
+      // 8. Restore comments in the new table
+      if (commentCount > 0) {
+        setStatus("Restoring comments...");
+        await GF.Comments.restoreComments(commentMap);
+      }
+
+      // Update column count state
+      _currentColumnCount = targetGroups;
+
+      var statusMsg =
+        "Converted to " +
+        targetGroups +
+        " columns. " +
+        sorted.length +
+        " items sorted. Use Ctrl+Z to undo.";
+      if (result.shrinkCount > 0) {
+        statusMsg += " " + result.shrinkCount + " cell(s) font-reduced.";
+      }
+      if (result.pageTableCount > 1) {
+        statusMsg +=
+          " Aligned " + result.pageTableCount + " tables on page.";
+      }
+      if (commentCount > 0) {
+        statusMsg += " " + commentCount + " comment(s) preserved.";
+      }
+      setStatus(statusMsg);
+
+      // Refresh section display (column count changed)
+      updateSectionDisplay();
+    } catch (e) {
+      console.error("Convert error:", e);
+      setStatus("Error: " + e.message);
+    }
+
+    sortBtn.disabled = false;
+    convertBtn.disabled = false;
   }
 
   // ── Uncolored Words Warning ──
@@ -274,7 +448,13 @@ GF.App = (function () {
       var beforeCount = monos.size;
 
       if (monos.has(word)) {
-        setStatus('"' + word + '" is already in the monos list (' + beforeCount + ' words).');
+        setStatus(
+          '"' +
+            word +
+            '" is already in the monos list (' +
+            beforeCount +
+            " words)."
+        );
         addBtn.disabled = false;
         return;
       }
@@ -288,7 +468,13 @@ GF.App = (function () {
         _monosCount + " words";
       document.getElementById("monos-empty").classList.add("hidden");
       setStatus(
-        'Added "' + word + '": ' + beforeCount + " → " + _monosCount + " monos."
+        'Added "' +
+          word +
+          '": ' +
+          beforeCount +
+          " \u2192 " +
+          _monosCount +
+          " monos."
       );
     } catch (e) {
       console.error("Failed to add mono:", e);

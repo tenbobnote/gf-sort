@@ -264,11 +264,41 @@ GF.Sorting = (function () {
     return dist;
   }
 
+  /**
+   * Estimate text width in points using per-character width ratios for Avenir Book.
+   * Ported from Python components.py estimate_text_width_pt().
+   */
+  function estimateTextWidthPt(text, fontSizePt) {
+    fontSizePt = fontSizePt || 11;
+    var width = 0;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (ch === "m" || ch === "w" || ch === "M" || ch === "W") {
+        width += 0.75;
+      } else if (ch >= "A" && ch <= "Z") {
+        width += 0.65;
+      } else if ("il|!.,;:'\"()".indexOf(ch) !== -1) {
+        width += 0.3;
+      } else if ("fjrt".indexOf(ch) !== -1) {
+        width += 0.4;
+      } else if (ch === " ") {
+        width += 0.25;
+      } else if ("\u00F6\u00E4\u00FC\u00D6\u00C4\u00DC\u00DF".indexOf(ch) !== -1) {
+        // öäüÖÄÜß
+        width += 0.6;
+      } else {
+        width += 0.55;
+      }
+    }
+    return width * fontSizePt;
+  }
+
   return {
     findEnding: findEnding,
     isCurrency: isCurrency,
     sortItems: sortItems,
     distributeItems: distributeItems,
+    estimateTextWidthPt: estimateTextWidthPt,
     ENDINGS: ENDINGS,
   };
 })();
