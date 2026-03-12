@@ -234,11 +234,76 @@ GF.Sorting = (function () {
     return 0;
   }
 
+  // ── Custom sort: Fractions (sort by numeric fraction value, smallest→largest) ──
+
+  /**
+   * Parse a fraction string like "1/8", "3/4", or "1 1/2" into a numeric value.
+   * Returns NaN if unparseable.
+   */
+  function parseFraction(text) {
+    text = text.trim();
+    // Mixed number: "1 1/2" → 1 + 0.5
+    var mixedMatch = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+    if (mixedMatch) {
+      return (
+        parseInt(mixedMatch[1], 10) +
+        parseInt(mixedMatch[2], 10) / parseInt(mixedMatch[3], 10)
+      );
+    }
+    // Simple fraction: "3/4" → 0.75
+    var fracMatch = text.match(/^(\d+)\/(\d+)$/);
+    if (fracMatch) {
+      return parseInt(fracMatch[1], 10) / parseInt(fracMatch[2], 10);
+    }
+    // Plain number fallback
+    var num = parseFloat(text);
+    return isNaN(num) ? Infinity : num;
+  }
+
+  function fractionSortKey(item) {
+    return [parseFraction(item.translation)];
+  }
+
+  // ── Custom sort: Numbers (sort by numeric value; "(number)" first) ──
+
+  /**
+   * Parse a number translation like "8", "80,000", "1,000,000,000".
+   * Returns NaN if unparseable.
+   */
+  function parseNumber(text) {
+    text = text.trim().replace(/,/g, "");
+    var num = parseFloat(text);
+    return isNaN(num) ? Infinity : num;
+  }
+
+  function numberSortKey(item) {
+    var trans = item.translation.trim().toLowerCase();
+    // "(number)" or "number" sorts first
+    if (trans === "number" || trans === "(number)") {
+      return [-1];
+    }
+    return [parseNumber(item.translation)];
+  }
+
+  // Categories with custom sort-by-translation logic (bypass standard sort)
+  var CUSTOM_SORT_CATEGORIES = {
+    Fractions: fractionSortKey,
+    Numbers: numberSortKey,
+  };
+
   /**
    * Sort items according to the section type's hierarchy.
+   * For Fractions/Numbers, uses custom translation-based sort instead.
    * Returns a new sorted array (does not mutate input).
    */
-  function sortItems(items, sectionType, mainGender, monosSet) {
+  function sortItems(items, sectionType, mainGender, monosSet, categoryName) {
+    var customKeyFn = categoryName && CUSTOM_SORT_CATEGORIES[categoryName];
+    if (customKeyFn) {
+      return items.slice().sort(function (a, b) {
+        return compareKeys(customKeyFn(a), customKeyFn(b));
+      });
+    }
+
     var keyFn =
       sectionType === "Predictable" ? predictableSortKey : unpredictableSortKey;
 

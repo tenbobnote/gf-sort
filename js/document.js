@@ -24,11 +24,19 @@ GF.Document = (function () {
     Colors: "n",
     Gerunds: "n",
     "Metals & Materials": "n",
+    Fractions: "n",
     "Fruits & Nuts": "f",
     Numbers: "f",
   };
 
   var CATEGORY_NAMES = Object.keys(SORTABLE_CATEGORIES);
+
+  // Categories that have no Predictable/Unpredictable section headings
+  // (flat lists sorted by custom rules in sorting.js)
+  var NO_SECTION_CATEGORIES = {
+    Fractions: true,
+    Numbers: true,
+  };
 
   // ── Layout constants ──
   var DEFAULT_FONT_SIZE = 11;
@@ -85,6 +93,7 @@ GF.Document = (function () {
           : null;
 
       var sectionType = null;
+      var hasSectionHeading = true;
 
       if (lastPred && lastUnpred) {
         var comp = lastPred.compareLocationWith(lastUnpred);
@@ -95,21 +104,29 @@ GF.Document = (function () {
       } else if (lastUnpred) {
         sectionType = "Unpredictable";
       } else {
-        return { error: "No section heading found before this table." };
+        hasSectionHeading = false;
       }
 
-      // Find the category name by searching before the section heading
-      var headingRange =
-        sectionType === "Predictable" ? lastPred : lastUnpred;
-      var beforeHeading = context.document.body
-        .getRange("Start")
-        .expandTo(headingRange.getRange("Start"));
+      // Determine search range for category name
+      var searchRange;
+      if (hasSectionHeading) {
+        // Search before the section heading
+        var headingRange =
+          sectionType === "Predictable" ? lastPred : lastUnpred;
+        searchRange = context.document.body
+          .getRange("Start")
+          .expandTo(headingRange.getRange("Start"));
+      } else {
+        // No Predictable/Unpredictable heading — search before the table
+        // (for flat-list categories like Fractions, Numbers)
+        searchRange = beforeTable;
+      }
 
       // Search for each known category name
       var searches = {};
       for (var i = 0; i < CATEGORY_NAMES.length; i++) {
         var cat = CATEGORY_NAMES[i];
-        searches[cat] = beforeHeading.search(cat, { matchCase: false });
+        searches[cat] = searchRange.search(cat, { matchCase: false });
         searches[cat].load("items");
       }
       await context.sync();
@@ -127,10 +144,13 @@ GF.Document = (function () {
       }
 
       if (candidates.length === 0) {
+        if (!hasSectionHeading) {
+          return { error: "No section heading found before this table." };
+        }
         return { error: "No category title found. Is this a noun-group page?" };
       }
 
-      // Find the latest candidate (closest to the heading)
+      // Find the latest candidate (closest to the table/heading)
       var closest = candidates[0];
       for (var c = 1; c < candidates.length; c++) {
         var cmp = candidates[c].range.compareLocationWith(closest.range);
@@ -138,6 +158,11 @@ GF.Document = (function () {
         if (cmp.value === "After") {
           closest = candidates[c];
         }
+      }
+
+      // If no section heading, only allow categories with custom sort
+      if (!hasSectionHeading && !NO_SECTION_CATEGORIES[closest.category]) {
+        return { error: "No section heading found before this table." };
       }
 
       return {

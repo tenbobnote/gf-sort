@@ -104,7 +104,8 @@ GF.App = (function () {
     document.getElementById("no-section").classList.add("hidden");
     document.getElementById("current-section").classList.remove("hidden");
     document.getElementById("category-name").textContent = section.pageTitle;
-    document.getElementById("section-type").textContent = section.sectionType;
+    document.getElementById("section-type").textContent =
+      section.sectionType || "Custom sort";
 
     var genderLabel = { m: "Masculine", f: "Feminine", n: "Neuter" };
     document.getElementById("main-gender").textContent =
@@ -215,7 +216,8 @@ GF.App = (function () {
         tableData.items,
         _currentSection.sectionType,
         _currentSection.mainGender,
-        monosSet
+        monosSet,
+        _currentSection.pageTitle
       );
 
       // 6. Check if order actually changed
@@ -345,7 +347,8 @@ GF.App = (function () {
         tableData.items,
         _currentSection.sectionType,
         _currentSection.mainGender,
-        monosSet
+        monosSet,
+        _currentSection.pageTitle
       );
 
       // 6. Delete original comments
@@ -467,7 +470,8 @@ GF.App = (function () {
           tableData.items,
           section.sectionType,
           section.mainGender,
-          monosSet
+          monosSet,
+          section.pageTitle
         );
 
         // Write with alignment
