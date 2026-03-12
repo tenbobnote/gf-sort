@@ -23,6 +23,9 @@ GF.App = (function () {
       .getElementById("convert-btn")
       .addEventListener("click", onConvertClick);
     document
+      .getElementById("sort-all-btn")
+      .addEventListener("click", onSortAllClick);
+    document
       .getElementById("add-mono-btn")
       .addEventListener("click", onAddMonoClick);
     document
@@ -393,6 +396,107 @@ GF.App = (function () {
       setStatus("Error: " + e.message);
     }
 
+    sortBtn.disabled = false;
+    convertBtn.disabled = false;
+  }
+
+  // ── Sort All Operation ──
+
+  async function onSortAllClick() {
+    var sortAllBtn = document.getElementById("sort-all-btn");
+    var sortBtn = document.getElementById("sort-btn");
+    var convertBtn = document.getElementById("convert-btn");
+    sortAllBtn.disabled = true;
+    sortBtn.disabled = true;
+    convertBtn.disabled = true;
+
+    try {
+      setStatus("Loading reference data...");
+      GF.Monos.clearCache();
+      var monosSet = await GF.Monos.getMonosSet();
+
+      var tableCount = await GF.Document.getTableCount();
+      var sorted = 0;
+      var skipped = 0;
+      var totalShrinks = 0;
+
+      for (var t = 0; t < tableCount; t++) {
+        setStatus(
+          "Processing table " + (t + 1) + " of " + tableCount + "..."
+        );
+
+        // Select this table
+        var selected = await GF.Document.selectTable(t);
+        if (!selected) {
+          skipped++;
+          continue;
+        }
+
+        // Detect section
+        var section = await GF.Document.detectSection();
+        if (section.error) {
+          skipped++;
+          continue;
+        }
+
+        // Read items
+        var tableData = await GF.Document.readTableItems();
+        if (tableData.error || tableData.items.length === 0) {
+          skipped++;
+          continue;
+        }
+        if (tableData.uncolored.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        // Capture comments
+        var commentMap = {};
+        var commentCount = 0;
+        var tableCommentCount = await GF.Comments.countCommentsInTable();
+        if (tableCommentCount > 0) {
+          commentMap = await GF.Comments.captureComments();
+          commentCount = GF.Comments.countComments(commentMap);
+          if (commentCount > 0) {
+            await GF.Comments.deleteOriginalComments(commentMap);
+          }
+        }
+
+        // Sort
+        var sortedItems = GF.Sorting.sortItems(
+          tableData.items,
+          section.sectionType,
+          section.mainGender,
+          monosSet
+        );
+
+        // Write with alignment
+        var result = await GF.Document.sortWithAlignment(
+          sortedItems,
+          tableData.numGroups
+        );
+        totalShrinks += result.shrinkCount;
+
+        // Restore comments
+        if (commentCount > 0) {
+          await GF.Comments.restoreComments(commentMap);
+        }
+
+        sorted++;
+      }
+
+      var msg = "Done! Sorted " + sorted + " tables, skipped " + skipped + ".";
+      if (totalShrinks > 0) {
+        msg += " " + totalShrinks + " cell(s) font-reduced.";
+      }
+      msg += " Use Ctrl+Z to undo.";
+      setStatus(msg);
+    } catch (e) {
+      console.error("Sort all error:", e);
+      setStatus("Error: " + e.message);
+    }
+
+    sortAllBtn.disabled = false;
     sortBtn.disabled = false;
     convertBtn.disabled = false;
   }

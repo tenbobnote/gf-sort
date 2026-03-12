@@ -1207,6 +1207,34 @@ GF.Document = (function () {
   // PUBLIC API
   // =========================================================================
 
+  /**
+   * Get the total number of tables in the document.
+   */
+  async function getTableCount() {
+    return Word.run(async function (context) {
+      var tables = context.document.body.tables;
+      tables.load("items");
+      await context.sync();
+      return tables.items.length;
+    });
+  }
+
+  /**
+   * Select a table by index (0-based), placing the cursor at its start.
+   * Returns true if the table was selected, false if index out of range.
+   */
+  async function selectTable(index) {
+    return Word.run(async function (context) {
+      var tables = context.document.body.tables;
+      tables.load("items");
+      await context.sync();
+      if (index >= tables.items.length) return false;
+      tables.items[index].getRange("Start").select();
+      await context.sync();
+      return true;
+    });
+  }
+
   return {
     detectSection: detectSection,
     readTableItems: readTableItems,
@@ -1214,6 +1242,8 @@ GF.Document = (function () {
     getColumnCount: getColumnCount,
     sortWithAlignment: sortWithAlignment,
     convertAndSort: convertAndSort,
+    getTableCount: getTableCount,
+    selectTable: selectTable,
     SORTABLE_CATEGORIES: SORTABLE_CATEGORIES,
   };
 })();
