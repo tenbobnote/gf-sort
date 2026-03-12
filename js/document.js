@@ -32,10 +32,12 @@ GF.Document = (function () {
   var CATEGORY_NAMES = Object.keys(SORTABLE_CATEGORIES);
 
   // Categories that have no Predictable/Unpredictable section headings
-  // (flat lists sorted by custom rules in sorting.js)
+  // (flat lists — alphabetical sort or custom sort via sorting.js)
   var NO_SECTION_CATEGORIES = {
     Fractions: true,
     Numbers: true,
+    Gerunds: true,
+    Colors: true,
   };
 
   // ── Layout constants ──
@@ -51,6 +53,9 @@ GF.Document = (function () {
 
   /**
    * Detect the current section based on cursor position.
+   * Strategy: find the closest category name first, then decide whether
+   * to look for Predictable/Unpredictable section headings based on
+   * whether the category is a flat-list (NO_SECTION_CATEGORIES) or not.
    * Returns: { pageTitle, sectionType, mainGender } or { error }.
    */
   async function detectSection() {
@@ -69,69 +74,15 @@ GF.Document = (function () {
         .getRange("Start")
         .expandTo(tableStart);
 
-      // Search for "Predictable" and "Unpredictable" before the table
-      var predResults = beforeTable.search("Predictable", {
-        matchWholeWord: true,
-        matchCase: true,
-      });
-      var unpredResults = beforeTable.search("Unpredictable", {
-        matchWholeWord: true,
-        matchCase: true,
-      });
-      predResults.load("items");
-      unpredResults.load("items");
-      await context.sync();
-
-      // Find the closest heading (last match = closest to the table)
-      var lastPred =
-        predResults.items.length > 0
-          ? predResults.items[predResults.items.length - 1]
-          : null;
-      var lastUnpred =
-        unpredResults.items.length > 0
-          ? unpredResults.items[unpredResults.items.length - 1]
-          : null;
-
-      var sectionType = null;
-      var hasSectionHeading = true;
-
-      if (lastPred && lastUnpred) {
-        var comp = lastPred.compareLocationWith(lastUnpred);
-        await context.sync();
-        sectionType = comp.value === "After" ? "Predictable" : "Unpredictable";
-      } else if (lastPred) {
-        sectionType = "Predictable";
-      } else if (lastUnpred) {
-        sectionType = "Unpredictable";
-      } else {
-        hasSectionHeading = false;
-      }
-
-      // Determine search range for category name
-      var searchRange;
-      if (hasSectionHeading) {
-        // Search before the section heading
-        var headingRange =
-          sectionType === "Predictable" ? lastPred : lastUnpred;
-        searchRange = context.document.body
-          .getRange("Start")
-          .expandTo(headingRange.getRange("Start"));
-      } else {
-        // No Predictable/Unpredictable heading — search before the table
-        // (for flat-list categories like Fractions, Numbers)
-        searchRange = beforeTable;
-      }
-
-      // Search for each known category name
+      // Step 1: Find the closest category name before the table
       var searches = {};
       for (var i = 0; i < CATEGORY_NAMES.length; i++) {
         var cat = CATEGORY_NAMES[i];
-        searches[cat] = searchRange.search(cat, { matchCase: false });
+        searches[cat] = beforeTable.search(cat, { matchCase: false });
         searches[cat].load("items");
       }
       await context.sync();
 
-      // Find the closest category (last match among all searches)
       var candidates = [];
       for (var cat in searches) {
         var results = searches[cat];
@@ -144,13 +95,10 @@ GF.Document = (function () {
       }
 
       if (candidates.length === 0) {
-        if (!hasSectionHeading) {
-          return { error: "No section heading found before this table." };
-        }
         return { error: "No category title found. Is this a noun-group page?" };
       }
 
-      // Find the latest candidate (closest to the table/heading)
+      // Find the latest candidate (closest to the table)
       var closest = candidates[0];
       for (var c = 1; c < candidates.length; c++) {
         var cmp = candidates[c].range.compareLocationWith(closest.range);
@@ -160,9 +108,56 @@ GF.Document = (function () {
         }
       }
 
-      // If no section heading, only allow categories with custom sort
-      if (!hasSectionHeading && !NO_SECTION_CATEGORIES[closest.category]) {
-        return { error: "No section heading found before this table." };
+      // Step 2: If this is a flat-list category, return immediately (no section headings)
+      if (NO_SECTION_CATEGORIES[closest.category]) {
+        return {
+          pageTitle: closest.category,
+          sectionType: null,
+          mainGender: SORTABLE_CATEGORIES[closest.category],
+        };
+      }
+
+      // Step 3: For standard categories, find the closest Predictable/Unpredictable
+      // heading between the category title and the table
+      var categoryToTable = closest.range.expandTo(tableStart);
+      var predResults = categoryToTable.search("Predictable", {
+        matchWholeWord: true,
+        matchCase: true,
+      });
+      var unpredResults = categoryToTable.search("Unpredictable", {
+        matchWholeWord: true,
+        matchCase: true,
+      });
+      predResults.load("items");
+      unpredResults.load("items");
+      await context.sync();
+
+      var lastPred =
+        predResults.items.length > 0
+          ? predResults.items[predResults.items.length - 1]
+          : null;
+      var lastUnpred =
+        unpredResults.items.length > 0
+          ? unpredResults.items[unpredResults.items.length - 1]
+          : null;
+
+      var sectionType = null;
+
+      if (lastPred && lastUnpred) {
+        var comp = lastPred.compareLocationWith(lastUnpred);
+        await context.sync();
+        sectionType = comp.value === "After" ? "Predictable" : "Unpredictable";
+      } else if (lastPred) {
+        sectionType = "Predictable";
+      } else if (lastUnpred) {
+        sectionType = "Unpredictable";
+      } else {
+        return {
+          error:
+            "No Predictable/Unpredictable heading found for " +
+            closest.category +
+            ".",
+        };
       }
 
       return {

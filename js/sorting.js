@@ -291,9 +291,15 @@ GF.Sorting = (function () {
     Numbers: numberSortKey,
   };
 
+  // Default alphabetical sort for flat-list categories without custom sort
+  function alphabeticalSortKey(item) {
+    return [item.word.toLowerCase()];
+  }
+
   /**
    * Sort items according to the section type's hierarchy.
-   * For Fractions/Numbers, uses custom translation-based sort instead.
+   * For flat-list categories: uses custom sort if defined, else alphabetical.
+   * For sectioned categories: uses Predictable/Unpredictable sort hierarchy.
    * Returns a new sorted array (does not mutate input).
    */
   function sortItems(items, sectionType, mainGender, monosSet, categoryName) {
@@ -301,6 +307,13 @@ GF.Sorting = (function () {
     if (customKeyFn) {
       return items.slice().sort(function (a, b) {
         return compareKeys(customKeyFn(a), customKeyFn(b));
+      });
+    }
+
+    // Flat-list category with no custom sort — sort alphabetically
+    if (!sectionType) {
+      return items.slice().sort(function (a, b) {
+        return compareKeys(alphabeticalSortKey(a), alphabeticalSortKey(b));
       });
     }
 
