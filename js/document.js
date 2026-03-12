@@ -1044,10 +1044,35 @@ GF.Document = (function () {
       // 6. Compute column layout across all page tables
       var layout = _computeColumnLayout(allTableGroups, numGroups);
 
-      // 7. Compute font shrinks for all tables
+      // 7. Check if cross-table layout squeezes current table's translations
+      //    below minimum readable size. If so, fall back to independent layout.
+      if (allTableGroups.length > 1) {
+        var crossTableOverflow = false;
+        for (var g = 0; g < numGroups && !crossTableOverflow; g++) {
+          var items = allTableGroups[0].groups[g] || [];
+          for (var i = 0; i < items.length; i++) {
+            var minTW = _neededWidth(
+              "(" + items[i].translation + ")",
+              MIN_FONT_SIZE
+            );
+            if (minTW > layout.transWidths[g]) {
+              crossTableOverflow = true;
+              break;
+            }
+          }
+        }
+        if (crossTableOverflow) {
+          layout = _computeColumnLayout([allTableGroups[0]], numGroups);
+          otherTables = [];
+          otherTableGroups = [];
+          allTableGroups = [allTableGroups[0]];
+        }
+      }
+
+      // 8. Compute font shrinks for all tables
       var shrinks = _computeFontShrinks(allTableGroups, layout);
 
-      // 8. Write sorted items to current table with layout
+      // 9. Write sorted items to current table with layout
       await _writeItemsWithLayout(
         context,
         currentTable,
@@ -1057,7 +1082,7 @@ GF.Document = (function () {
         shrinks[0]
       );
 
-      // 9. Apply layout to other page tables (widths + font sizes only)
+      // 10. Apply layout to other page tables (widths + font sizes only)
       for (var i = 0; i < otherTables.length; i++) {
         await _applyLayoutToTable(
           context,
@@ -1181,6 +1206,31 @@ GF.Document = (function () {
 
       // 7. Compute layout and shrinks
       var layout = _computeColumnLayout(allTableGroups, targetGroups);
+
+      // Check for cross-table translation overflow — fall back to independent
+      if (allTableGroups.length > 1) {
+        var crossTableOverflow = false;
+        for (var g = 0; g < targetGroups && !crossTableOverflow; g++) {
+          var items = allTableGroups[0].groups[g] || [];
+          for (var i = 0; i < items.length; i++) {
+            var minTW = _neededWidth(
+              "(" + items[i].translation + ")",
+              MIN_FONT_SIZE
+            );
+            if (minTW > layout.transWidths[g]) {
+              crossTableOverflow = true;
+              break;
+            }
+          }
+        }
+        if (crossTableOverflow) {
+          layout = _computeColumnLayout([allTableGroups[0]], targetGroups);
+          otherTables = [];
+          otherTableGroups = [];
+          allTableGroups = [allTableGroups[0]];
+        }
+      }
+
       var shrinks = _computeFontShrinks(allTableGroups, layout);
 
       // 8. Write items to the new table with layout
