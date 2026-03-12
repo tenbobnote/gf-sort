@@ -874,6 +874,7 @@ GF.Document = (function () {
           // Write word
           wordCell.body.clear();
           var wordPara = wordCell.body.paragraphs.getFirst();
+          wordPara.style = "Normal";
           var wordRange = wordPara.insertText(item.word, "Start");
           wordRange.font.color = item.color;
           wordRange.font.name = "Avenir Book";
@@ -887,6 +888,7 @@ GF.Document = (function () {
           // Write translation
           transCell.body.clear();
           var transPara = transCell.body.paragraphs.getFirst();
+          transPara.style = "Normal";
           var transRange = transPara.insertText(
             "(" + item.translation + ")",
             "Start"
