@@ -647,6 +647,15 @@ GF.Document = (function () {
       transWidths.push(setWidths[g] - wordW);
     }
 
+    // For 3-col: center the middle column's word-trans boundary on the page.
+    // The boundary between word and translation in the middle set should be
+    // at TABLE_WIDTH_PT / 2, so: setWidths[0] + wordWidths[1] = pageCenter.
+    if (numGroups === 3) {
+      var pageCenter = tableWidthPt / 2;
+      wordWidths[1] = pageCenter - setWidths[0];
+      transWidths[1] = setWidths[1] - wordWidths[1];
+    }
+
     return {
       setWidths: setWidths,
       wordWidths: wordWidths,
