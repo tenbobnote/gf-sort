@@ -603,19 +603,28 @@ GF.Document = (function () {
     var wordWidths, transWidths, setWidths;
 
     if (totalGap <= 0) {
-      // Content exceeds table width — distribute proportionally.
-      // Font shrinking will handle the overflow.
-      wordWidths = [];
+      // Content exceeds table width — words get full width (never shrunk),
+      // translations share whatever remains. Font shrinking handles the rest.
+      var totalWordWidth = 0;
+      for (var g = 0; g < numGroups; g++) {
+        totalWordWidth += maxWordPt[g];
+      }
+      var remainingForTrans = Math.max(tableWidthPt - totalWordWidth, 0);
+      var totalTransNeeded = 0;
+      for (var g = 0; g < numGroups; g++) {
+        totalTransNeeded += maxTransPt[g];
+      }
+
+      wordWidths = maxWordPt.slice();
       transWidths = [];
       setWidths = [];
       for (var g = 0; g < numGroups; g++) {
-        var ratio = (maxWordPt[g] + maxTransPt[g]) / totalContent;
-        var setW = ratio * tableWidthPt;
-        var wordRatio = maxWordPt[g] / (maxWordPt[g] + maxTransPt[g]);
-        var ww = wordRatio * setW;
-        wordWidths.push(ww);
-        transWidths.push(setW - ww);
-        setWidths.push(setW);
+        var tw =
+          totalTransNeeded > 0
+            ? (maxTransPt[g] / totalTransNeeded) * remainingForTrans
+            : remainingForTrans / numGroups;
+        transWidths.push(tw);
+        setWidths.push(wordWidths[g] + tw);
       }
     } else {
       // Size each column to its content, then distribute remaining space
@@ -777,13 +786,15 @@ GF.Document = (function () {
         var groupShrinks = {};
         var items = allTableGroups[t].groups[g] || [];
         for (var i = 0; i < items.length; i++) {
-          var item = items[i];
-          var wordFont = _findFitFontSize(item.word, layout.wordWidths[g]);
-          var transText = "(" + item.translation + ")";
+          // Words are NEVER shrunk — only translations
+          var transText = "(" + items[i].translation + ")";
           var transFont = _findFitFontSize(transText, layout.transWidths[g]);
 
-          if (wordFont < DEFAULT_FONT_SIZE || transFont < DEFAULT_FONT_SIZE) {
-            groupShrinks[i] = { wordFont: wordFont, transFont: transFont };
+          if (transFont < DEFAULT_FONT_SIZE) {
+            groupShrinks[i] = {
+              wordFont: DEFAULT_FONT_SIZE,
+              transFont: transFont,
+            };
           }
         }
         tableShrinks.push(groupShrinks);
