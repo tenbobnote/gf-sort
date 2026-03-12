@@ -285,10 +285,18 @@ GF.Sorting = (function () {
     return [parseNumber(item.translation)];
   }
 
-  // Categories with custom sort-by-translation logic (bypass standard sort)
+  // ── Custom sort: Gerunds (alphabetical, empty translations last) ──
+
+  function gerundSortKey(item) {
+    var hasTranslation = item.translation && item.translation.trim() !== "" ? 0 : 1;
+    return [hasTranslation, item.word.toLowerCase()];
+  }
+
+  // Categories with custom sort logic (bypass standard Predictable/Unpredictable sort)
   var CUSTOM_SORT_CATEGORIES = {
     Fractions: fractionSortKey,
     Numbers: numberSortKey,
+    Gerunds: gerundSortKey,
   };
 
   // Default alphabetical sort for flat-list categories without custom sort

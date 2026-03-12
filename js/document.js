@@ -353,15 +353,17 @@ GF.Document = (function () {
 
             transCell.body.clear();
             var transPara = transCell.body.paragraphs.getFirst();
-            var transRange = transPara.insertText(
-              "(" + item.translation + ")",
-              "Start"
-            );
-            transRange.font.color = "#555555";
-            transRange.font.name = "Avenir Book";
-            transRange.font.size = 11;
-            transRange.font.bold = false;
-            transRange.font.italic = false;
+            var displayTrans = item.translation
+              ? "(" + item.translation + ")"
+              : "";
+            if (displayTrans) {
+              var transRange = transPara.insertText(displayTrans, "Start");
+              transRange.font.color = "#555555";
+              transRange.font.name = "Avenir Book";
+              transRange.font.size = 11;
+              transRange.font.bold = false;
+              transRange.font.italic = false;
+            }
             transPara.alignment = "Left";
             transPara.spaceAfter = 0;
             transPara.spaceBefore = 0;
@@ -601,10 +603,10 @@ GF.Document = (function () {
         var items = allTableGroups[t].groups[g] || [];
         for (var i = 0; i < items.length; i++) {
           var ww = _neededWidth(items[i].word, DEFAULT_FONT_SIZE);
-          var tw = _neededWidth(
-            "(" + items[i].translation + ")",
-            DEFAULT_FONT_SIZE
-          );
+          var transDisplay = items[i].translation
+            ? "(" + items[i].translation + ")"
+            : "";
+          var tw = _neededWidth(transDisplay, DEFAULT_FONT_SIZE);
           mw = Math.max(mw, ww);
           mt = Math.max(mt, tw);
         }
@@ -768,10 +770,10 @@ GF.Document = (function () {
       var items = allTableGroups[t].groups[g] || [];
       for (var i = 0; i < items.length; i++) {
         var ww = _neededWidth(items[i].word, MIN_FONT_SIZE);
-        var tw = _neededWidth(
-          "(" + items[i].translation + ")",
-          MIN_FONT_SIZE
-        );
+        var transDisplay = items[i].translation
+          ? "(" + items[i].translation + ")"
+          : "";
+        var tw = _neededWidth(transDisplay, MIN_FONT_SIZE);
         maxNeeded = Math.max(maxNeeded, ww + tw);
       }
     }
@@ -807,8 +809,12 @@ GF.Document = (function () {
         var items = allTableGroups[t].groups[g] || [];
         for (var i = 0; i < items.length; i++) {
           // Words are NEVER shrunk — only translations
-          var transText = "(" + items[i].translation + ")";
-          var transFont = _findFitFontSize(transText, layout.transWidths[g]);
+          var transText = items[i].translation
+            ? "(" + items[i].translation + ")"
+            : "";
+          var transFont = transText
+            ? _findFitFontSize(transText, layout.transWidths[g])
+            : DEFAULT_FONT_SIZE;
 
           if (transFont < DEFAULT_FONT_SIZE) {
             groupShrinks[i] = {
@@ -920,15 +926,17 @@ GF.Document = (function () {
           transCell.body.clear();
           var transPara = transCell.body.paragraphs.getFirst();
           transPara.style = "Normal";
-          var transRange = transPara.insertText(
-            "(" + item.translation + ")",
-            "Start"
-          );
-          transRange.font.color = "#555555";
-          transRange.font.name = "Avenir Book";
-          transRange.font.size = transFontSize;
-          transRange.font.bold = false;
-          transRange.font.italic = false;
+          var displayTrans = item.translation
+            ? "(" + item.translation + ")"
+            : "";
+          if (displayTrans) {
+            var transRange = transPara.insertText(displayTrans, "Start");
+            transRange.font.color = "#555555";
+            transRange.font.name = "Avenir Book";
+            transRange.font.size = transFontSize;
+            transRange.font.bold = false;
+            transRange.font.italic = false;
+          }
           transPara.alignment = "Left";
           transPara.spaceAfter = 0;
           transPara.spaceBefore = 0;
@@ -1071,10 +1079,10 @@ GF.Document = (function () {
         for (var g = 0; g < numGroups && !crossTableOverflow; g++) {
           var items = allTableGroups[0].groups[g] || [];
           for (var i = 0; i < items.length; i++) {
-            var minTW = _neededWidth(
-              "(" + items[i].translation + ")",
-              MIN_FONT_SIZE
-            );
+            var transDisplay = items[i].translation
+              ? "(" + items[i].translation + ")"
+              : "";
+            var minTW = _neededWidth(transDisplay, MIN_FONT_SIZE);
             if (minTW > layout.transWidths[g]) {
               crossTableOverflow = true;
               break;
@@ -1233,10 +1241,10 @@ GF.Document = (function () {
         for (var g = 0; g < targetGroups && !crossTableOverflow; g++) {
           var items = allTableGroups[0].groups[g] || [];
           for (var i = 0; i < items.length; i++) {
-            var minTW = _neededWidth(
-              "(" + items[i].translation + ")",
-              MIN_FONT_SIZE
-            );
+            var transDisplay = items[i].translation
+              ? "(" + items[i].translation + ")"
+              : "";
+            var minTW = _neededWidth(transDisplay, MIN_FONT_SIZE);
             if (minTW > layout.transWidths[g]) {
               crossTableOverflow = true;
               break;
