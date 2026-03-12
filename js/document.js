@@ -648,13 +648,6 @@ GF.Document = (function () {
       }
     }
 
-    // For 3-col: center the middle column's word-trans boundary on the page.
-    if (numGroups === 3) {
-      var pageCenter = tableWidthPt / 2;
-      wordWidths[1] = pageCenter - setWidths[0];
-      transWidths[1] = setWidths[1] - wordWidths[1];
-    }
-
     return {
       setWidths: setWidths,
       wordWidths: wordWidths,
