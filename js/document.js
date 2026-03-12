@@ -1096,21 +1096,18 @@ GF.Document = (function () {
         throw new Error("Cursor is no longer inside a table.");
       }
 
-      // Get the range just before the table for reinsertion
-      var rangeBeforeTable = currentTable.getRange("Before");
-      await context.sync();
-
-      // 2. Delete the old table
-      currentTable.delete();
-      await context.sync();
-
-      // 3. Compute new table dimensions
+      // 2. Compute new table dimensions
       var dist = GF.Sorting.distributeItems(sortedItems.length, targetGroups);
       var maxRows = Math.max.apply(null, dist);
       var numCols = targetGroups * 2;
 
-      // 4. Insert new table at the old position
-      var newTable = rangeBeforeTable.insertTable(maxRows, numCols, "After");
+      // 3. Insert new table AFTER the current one (while it still exists)
+      var afterRange = currentTable.getRange("After");
+      var newTable = afterRange.insertTable(maxRows, numCols, "After");
+      await context.sync();
+
+      // 4. Delete the old table (new table reference remains valid)
+      currentTable.delete();
       await context.sync();
 
       // 5. Remove borders on the new table
