@@ -570,7 +570,6 @@ GF.Document = (function () {
    */
   function _computeColumnLayout(allTableGroups, numGroups) {
     var tableWidthPt = TABLE_WIDTH_PT;
-    var equalSetWidth = tableWidthPt / numGroups;
 
     // For each column position, find max word and trans width across all tables
     var maxWordPt = [];
@@ -594,62 +593,62 @@ GF.Document = (function () {
       maxTransPt.push(mt);
     }
 
-    // Compute needed width per set at default font size
-    var neededAtDefault = [];
+    // Total content width (tight-fit, no visual gaps)
+    var totalContent = 0;
     for (var g = 0; g < numGroups; g++) {
-      neededAtDefault.push(maxWordPt[g] + maxTransPt[g]);
+      totalContent += maxWordPt[g] + maxTransPt[g];
     }
 
-    // Check for overflow at equal widths
-    var hasOverflow = false;
-    for (var g = 0; g < numGroups; g++) {
-      if (neededAtDefault[g] > equalSetWidth) {
-        hasOverflow = true;
-        break;
-      }
-    }
+    var totalGap = tableWidthPt - totalContent;
+    var wordWidths, transWidths, setWidths;
 
-    var setWidths;
-    if (!hasOverflow) {
-      // All fit at equal width
+    if (totalGap <= 0) {
+      // Content exceeds table width — distribute proportionally.
+      // Font shrinking will handle the overflow.
+      wordWidths = [];
+      transWidths = [];
       setWidths = [];
       for (var g = 0; g < numGroups; g++) {
-        setWidths.push(equalSetWidth);
+        var ratio = (maxWordPt[g] + maxTransPt[g]) / totalContent;
+        var setW = ratio * tableWidthPt;
+        var wordRatio = maxWordPt[g] / (maxWordPt[g] + maxTransPt[g]);
+        var ww = wordRatio * setW;
+        wordWidths.push(ww);
+        transWidths.push(setW - ww);
+        setWidths.push(setW);
       }
     } else {
-      // Try to resolve by widening overflow columns
-      setWidths = _resolveOverflow(
-        numGroups,
-        tableWidthPt,
-        equalSetWidth,
-        neededAtDefault,
-        allTableGroups
-      );
-    }
+      // Size each column to its content, then distribute remaining space
+      // as equal visual gaps between column sets, centered on the page.
+      //
+      // N column sets → N-1 inner gaps + 2 outer margins.
+      // outerMargin = interGap / 2 centers the group.
+      // Visual gap between adjacent sets = interGap (half absorbed by each side).
+      var interGap = totalGap / numGroups;
+      var outerMargin = interGap / 2;
 
-    // Enforce 3-column symmetry: outer columns equal, middle centered
-    if (numGroups === 3) {
-      var outerWidth = (setWidths[0] + setWidths[2]) / 2;
-      var middleWidth = tableWidthPt - 2 * outerWidth;
-      setWidths[0] = outerWidth;
-      setWidths[1] = middleWidth;
-      setWidths[2] = outerWidth;
-    }
+      // Start with content-fitted widths
+      wordWidths = maxWordPt.slice();
+      transWidths = maxTransPt.slice();
 
-    // Compute word/trans split within each set.
-    // Word gets what it needs (capped at 70% of set), rest goes to translation.
-    var wordWidths = [];
-    var transWidths = [];
-    for (var g = 0; g < numGroups; g++) {
-      var wordW = Math.min(maxWordPt[g], setWidths[g] * 0.7);
-      wordW = Math.max(wordW, setWidths[g] * 0.3);
-      wordWidths.push(wordW);
-      transWidths.push(setWidths[g] - wordW);
+      // Left outer margin → extra space in first word column (right-aligned text)
+      wordWidths[0] += outerMargin;
+      // Right outer margin → extra space in last trans column (left-aligned text)
+      transWidths[numGroups - 1] += outerMargin;
+
+      // Inner gaps: split equally between adjacent trans and word columns
+      for (var g = 0; g < numGroups - 1; g++) {
+        transWidths[g] += interGap / 2;
+        wordWidths[g + 1] += interGap / 2;
+      }
+
+      setWidths = [];
+      for (var g = 0; g < numGroups; g++) {
+        setWidths.push(wordWidths[g] + transWidths[g]);
+      }
     }
 
     // For 3-col: center the middle column's word-trans boundary on the page.
-    // The boundary between word and translation in the middle set should be
-    // at TABLE_WIDTH_PT / 2, so: setWidths[0] + wordWidths[1] = pageCenter.
     if (numGroups === 3) {
       var pageCenter = tableWidthPt / 2;
       wordWidths[1] = pageCenter - setWidths[0];
