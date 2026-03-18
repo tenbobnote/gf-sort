@@ -220,8 +220,8 @@ GF.Sorting = (function () {
   function unpredictableSortKey(item, mainGender, monosSet) {
     return [
       isCurrency(item.translation) ? 1 : 0,
-      monosSet.has(item.word) ? 1 : 0,
       genderOrder(item.gender, mainGender, false, true),
+      monosSet.has(item.word) ? 1 : 0,
       item.word.toLowerCase(),
     ];
   }
